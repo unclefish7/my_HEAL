@@ -466,7 +466,7 @@ class OPV2VBaseDataset(Dataset):
         object_ids : list
             Length is number of bbx in current sample.
         """
-        return self.post_processor.generate_visible_object_center(
+        return self.post_processor.generate_object_center(
             cav_contents, reference_lidar_pose
         )
 
