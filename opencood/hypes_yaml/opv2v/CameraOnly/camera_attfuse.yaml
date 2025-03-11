@@ -18,7 +18,7 @@ train_params:
 comm_range: 70
 input_source: ['camera'] #, 'depth']
 label_type: 'camera'
-cav_lidar_range: &cav_lidar [-51.2, -51.2, -3, 51.2, 51.2, 1]
+cav_lidar_range: &cav_lidar [-51.2, -51.2, -30, 51.2, 51.2, 20]
 
 # add_data_extension: ['bev_visibility.png']
 
@@ -50,7 +50,7 @@ heter:
         rand_flip: False
         bot_pct_lim: [0.0, 0.05]
         cams: ['camera0', 'camera1', 'camera2', 'camera3', 'camera4']
-        Ncams: 4
+        Ncams: 5
 
 fusion:
   core_method: 'intermediateheter'
@@ -146,7 +146,7 @@ model:
     dir_args: *dir_args
 
 loss:
-  core_method: point_pillar_depth_loss
+  core_method: point_pillar_loss
   args:
     pos_cls_weight: 2.0
     cls:

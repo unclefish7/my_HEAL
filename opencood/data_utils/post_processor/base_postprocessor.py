@@ -202,7 +202,7 @@ class BasePostprocessor(object):
     def generate_object_center(self,
                                cav_contents,
                                reference_lidar_pose,
-                               enlarge_z=False):
+                               enlarge_z=True):
         """
         Retrieve all objects in a format of (n, 7), where 7 represents
         x, y, z, l, w, h, yaw or x, y, z, h, w, l, yaw.
