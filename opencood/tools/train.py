@@ -175,11 +175,11 @@ def main():
         scheduler.step(epoch)
 
         opencood_train_dataset.reinitialize()
-        break
+        # break
 
     print('Training Finished, checkpoints saved to %s' % saved_path)
 
-    run_test = False
+    run_test = True
     if run_test:
         fusion_method = opt.fusion_method
         cmd = f"python opencood/tools/inference.py --model_dir {saved_path} --fusion_method {fusion_method}"

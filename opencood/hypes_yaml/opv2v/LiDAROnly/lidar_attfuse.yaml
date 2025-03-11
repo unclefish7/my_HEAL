@@ -1,12 +1,16 @@
 name: HeterBaseline_opv2v_lidar_attfuse
-root_dir: "dataset/OPV2V/train"
-validate_dir: "dataset/OPV2V/validate"
-test_dir: "dataset/OPV2V/test"
+# root_dir: "dataset/OPV2V/train"
+# validate_dir: "dataset/OPV2V/validate"
+# test_dir: "dataset/OPV2V/test"
+
+root_dir: "dataset/mydataset/train"
+validate_dir: "dataset/mydataset/validate"
+test_dir: "dataset/mydataset/test"
 
 yaml_parser: "load_general_params"
 train_params:
   batch_size: &batch_size 2
-  epoches: 20
+  epoches: 2
   eval_freq: 2
   save_freq: 2
   max_cav: 5
