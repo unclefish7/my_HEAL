@@ -1,0 +1,170 @@
+name: HeterBaseline_opv2v_lidar_attfuse_voxelnet
+
+root_dir: "dataset/mydataset/train"
+validate_dir: "dataset/mydataset/validate"
+test_dir: "dataset/mydataset/test"
+
+yaml_parser: "load_general_params"
+train_params:
+  batch_size: &batch_size 1
+  epoches: 5
+  eval_freq: 5
+  save_freq: 5
+  max_cav: 4
+
+comm_range: 70
+input_source: ['lidar']
+label_type: 'lidar'
+cav_lidar_range: &cav_lidar [-50, -50, -5, 50, 50, 5]
+
+heter:
+  assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 
+  ego_modality: &ego_modality "m1"
+  mapping_dict:
+    m1: m1
+    m2: m1
+    m3: m1
+    m4: m1
+  modality_setting:
+    m1:
+      sensor_type: &sensor_type_m1 'lidar'
+      core_method: &core_method_m1 "voxelnet"   # ← 更换编码器
+
+      preprocess:
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size [0.8, 0.8, 2]
+          max_points_per_voxel: 8
+          max_voxel_train: 5000
+          max_voxel_test: 10000
+        cav_lidar_range: *cav_lidar
+
+fusion:
+  core_method: 'intermediateheter'
+  dataset: 'opv2v'
+  args: 
+    proj_first: false
+    grid_conf: None
+    data_aug_conf: None
+
+data_augment:
+  - NAME: random_world_flip
+    ALONG_AXIS_LIST: [ 'x' ]
+  - NAME: random_world_rotation
+    WORLD_ROT_ANGLE: [ -0.78539816, 0.78539816 ]
+  - NAME: random_world_scaling
+    WORLD_SCALE_RANGE: [ 0.95, 1.05 ]
+
+preprocess:
+  core_method: 'SpVoxelPreprocessor'
+  args:
+    voxel_size: [0.8, 0.8, 2]
+    max_points_per_voxel: 1
+    max_voxel_train: 1
+    max_voxel_test: 1
+  cav_lidar_range: *cav_lidar
+
+postprocess:
+  core_method: 'VoxelPostprocessor'
+  gt_range: *cav_lidar
+  anchor_args:
+    cav_lidar_range: *cav_lidar
+    l: 3.9
+    w: 1.6
+    h: 1.56
+    r: &anchor_yaw [0, 90]
+    feature_stride: 2
+    num: &anchor_num 2
+  target_args:
+    score_threshold: 0.1
+    pos_threshold: 0.6
+    neg_threshold: 0.45
+  order: 'hwl'
+  max_num: 150
+  nms_thresh: 0.15
+  dir_args: &dir_args
+    dir_offset: 0.7853
+    num_bins: 2
+    anchor_yaw: *anchor_yaw
+
+model:
+  core_method: heter_model_baseline
+  args:
+    ego_modality: *ego_modality
+    lidar_range: *cav_lidar
+
+    m1:
+      core_method: *core_method_m1
+      sensor_type: *sensor_type_m1
+
+      encoder_args:
+        voxel_size: *voxel_size
+        lidar_range: *cav_lidar
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64]
+
+        N: 128           # 输出特征数量
+        D: 5            # BEV 高度维度
+        H: 256           # BEV 高度方向像素
+        W: 256           # BEV 宽度方向像素
+        T: 4             # 自定义特征维度（可适当调）
+        anchor_num: *anchor_num
+
+
+      backbone_args:
+        layer_nums: [3, 5, 8]
+        layer_strides: [2, 2, 2]
+        num_filters: [64, 128, 256]
+        upsample_strides: [1, 2, 4]
+        num_upsample_filter: [128, 128, 128]
+
+      shrink_header:
+        kernal_size: [ 3 ]
+        stride: [ 1 ]
+        padding: [ 1 ]
+        dim: [ 256 ]
+        input_dim: 384
+
+    fusion_method: att
+    att:
+      feat_dim: 256
+
+    in_head: 256
+    anchor_number: *anchor_num
+    dir_args: *dir_args
+
+loss:
+  core_method: point_pillar_depth_loss
+  args:
+    pos_cls_weight: 2.0
+    cls:
+      type: 'SigmoidFocalLoss'
+      alpha: 0.25
+      gamma: 2.0
+      weight: 1.0
+    reg:
+      type: 'WeightedSmoothL1Loss'
+      sigma: 3.0
+      codewise: true
+      weight: 2.0
+    dir:
+      type: 'WeightedSoftmaxClassificationLoss'
+      weight: 0.2
+      args: *dir_args
+    depth:
+      weight: 1.0
+
+optimizer:
+  core_method: Adam
+  lr: 0.001
+  args:
+    eps: 1e-10
+    weight_decay: 1e-5
+
+lr_scheduler:
+  core_method: multistep
+  gamma: 0.1
+  step_size: [10, 25]
