@@ -3,22 +3,22 @@ name: HeterBaseline_opv2v_lidar_attfuse
 # validate_dir: "dataset/OPV2V/validate"
 # test_dir: "dataset/OPV2V/test"
 
-root_dir: "dataset/mydataset/train"
-validate_dir: "dataset/mydataset/validate"
-test_dir: "dataset/mydataset/test"
+root_dir: "dataset/mydataset_old/train"
+validate_dir: "dataset/mydataset_old/validate"
+test_dir: "dataset/mydataset_old/test"
 
 yaml_parser: "load_general_params"
 train_params:
-  batch_size: &batch_size 2
-  epoches: 2
+  batch_size: &batch_size 1
+  epoches: 20
   eval_freq: 2
   save_freq: 2
-  max_cav: 5
+  max_cav: 4
 
 comm_range: 70
 input_source: ['lidar']
 label_type: 'lidar'
-cav_lidar_range: &cav_lidar [-102.4, -102.4, -3, 102.4, 102.4, 1]
+cav_lidar_range: &cav_lidar [-102.4, -102.4, -1.5, 102.4, 102.4, 1.5]
 
 heter:
   assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 
@@ -38,7 +38,7 @@ heter:
         # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
         core_method: 'SpVoxelPreprocessor'
         args:
-          voxel_size: &voxel_size [0.4, 0.4, 4]
+          voxel_size: &voxel_size [0.4, 0.4, 3]
           max_points_per_voxel: 32
           max_voxel_train: 32000
           max_voxel_test: 70000
@@ -47,7 +47,7 @@ heter:
 
 
 fusion:
-  core_method: 'intermediateheter'
+  core_method: 'early'
   dataset: 'opv2v'
   args: 
     proj_first: false
@@ -68,10 +68,10 @@ preprocess:
   # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
   core_method: 'SpVoxelPreprocessor'
   args:
-    voxel_size: [0.4, 0.4, 4] # useful
-    max_points_per_voxel: 1 # useless
-    max_voxel_train: 1 # useless
-    max_voxel_test: 1 # useless
+    voxel_size: *voxel_size # useful
+    max_points_per_voxel: 32 # useless
+    max_voxel_train: 32000 # useless
+    max_voxel_test: 70000 # useless
   # lidar range for each individual cav.
   cav_lidar_range: *cav_lidar
 
@@ -81,18 +81,22 @@ postprocess:
   gt_range: *cav_lidar
   anchor_args:
     cav_lidar_range: *cav_lidar
-    l: 3.9
-    w: 1.6
-    h: 1.56
-    r: &anchor_yaw [0, 90]
+    l: 3.7
+    w: 1.8
+    h: 1.55
+    r: &anchor_yaw [0, 30, 60, 90, 120, 150]
     feature_stride: 2
-    num: &anchor_num 2
+    num: &anchor_num 6
   target_args:
+    # pos_threshold: 0.5
+    # neg_threshold: 0.3
+    # score_threshold: 0.1
     pos_threshold: 0.6
     neg_threshold: 0.45
     score_threshold: 0.2
   order: 'hwl' # hwl or lwh
   max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+  # nms_thresh: 0.3
   nms_thresh: 0.15
   dir_args: &dir_args
     dir_offset: 0.7853
@@ -145,7 +149,7 @@ model:
     dir_args: *dir_args
 
 loss:
-  core_method: point_pillar_depth_loss
+  core_method: point_pillar_loss
   args:
     pos_cls_weight: 2.0
     cls:
@@ -158,12 +162,12 @@ loss:
       sigma: 3.0
       codewise: true
       weight: 2.0
-    dir:
-      type: 'WeightedSoftmaxClassificationLoss'
-      weight: 0.2
-      args: *dir_args
-    depth:
-      weight: 1.0
+    # dir:
+    #   type: 'WeightedSoftmaxClassificationLoss'
+    #   weight: 0.2
+    #   args: *dir_args
+    # depth:
+    #   weight: 1.0
 
 optimizer:
   core_method: Adam
@@ -175,5 +179,5 @@ optimizer:
 lr_scheduler:
   core_method: multistep #step, multistep and Exponential support
   gamma: 0.1
-  step_size: [10, 25]
+  step_size: [5, 15]
 
