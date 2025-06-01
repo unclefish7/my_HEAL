@@ -453,7 +453,7 @@ def project_world_objects(object_dict,
                           lidar_pose,
                           lidar_range,
                           order,
-                          enlarge_z=True):
+                          enlarge_z=False):
     """
     Project the objects under world coordinates into another coordinate
     based on the provided extrinsic.

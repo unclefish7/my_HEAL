@@ -101,7 +101,7 @@ class BasePostprocessor(object):
         gt_box3d_np = gt_box3d_tensor.cpu().numpy()
         gt_box3d_np = box_utils.mask_boxes_outside_range_numpy(gt_box3d_np,
                                                     self.params['gt_range'],
-                                                    order=None)
+                                                    order=None, min_num_corners=1)
         gt_box3d_tensor = torch.from_numpy(gt_box3d_np).to(device=gt_box3d_list.device)
 
         return gt_box3d_tensor
@@ -202,7 +202,7 @@ class BasePostprocessor(object):
     def generate_object_center(self,
                                cav_contents,
                                reference_lidar_pose,
-                               enlarge_z=True):
+                               enlarge_z=False):
         """
         Retrieve all objects in a format of (n, 7), where 7 represents
         x, y, z, l, w, h, yaw or x, y, z, h, w, l, yaw.
