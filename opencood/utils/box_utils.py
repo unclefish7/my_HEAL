@@ -382,7 +382,7 @@ def get_mask_for_boxes_within_range_torch(boxes, gt_range):
 
 
 def mask_boxes_outside_range_numpy(boxes, limit_range, order,
-                                   min_num_corners=8, return_mask=False):
+                                   min_num_corners=1, return_mask=False):
     """
     Parameters
     ----------

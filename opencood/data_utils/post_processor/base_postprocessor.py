@@ -101,7 +101,7 @@ class BasePostprocessor(object):
         gt_box3d_np = gt_box3d_tensor.cpu().numpy()
         gt_box3d_np = box_utils.mask_boxes_outside_range_numpy(gt_box3d_np,
                                                     self.params['gt_range'],
-                                                    order=None, min_num_corners=1)
+                                                    order=None)
         gt_box3d_tensor = torch.from_numpy(gt_box3d_np).to(device=gt_box3d_list.device)
 
         return gt_box3d_tensor
