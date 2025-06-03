@@ -77,32 +77,3 @@ class BasePreprocessor(object):
         indices = indices[mask, :]
         bev_map[indices[:, 0], indices[:, 1]] = 1
         return bev_map
-        
-    def collate_batch(self, batch_dict_dict):
-        """
-        batch_dict_dict 是一个以 index 为 key 的 dict，
-        每个值是一个单独样本的处理结果 dict。
-
-        Parameters
-        ----------
-        batch_dict_dict : dict[int, dict]
-
-        Returns
-        -------
-        output_dict : dict[str, torch.Tensor]
-        """
-        import torch
-        # print("=== DEBUG collate_batch ===")
-        # print("type(batch_dict_dict):", type(batch_dict_dict))
-        # print("keys:", list(batch_dict_dict.keys()))
-        # print("sample type:", type(batch_dict_dict[list(batch_dict_dict.keys())[0]]))
-
-
-        downsample_lidar_list = []
-        for lidar_np in batch_dict_dict['downsample_lidar']:
-            lidar_tensor = torch.tensor(lidar_np, dtype=torch.float32)
-            downsample_lidar_list.append(lidar_tensor)
-
-        return {
-            'downsample_lidar': downsample_lidar_list  # 或 torch.stack() 如果 shape 一致
-        }
