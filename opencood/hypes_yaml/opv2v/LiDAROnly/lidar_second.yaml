@@ -1,18 +1,14 @@
-name: HeterBaseline_opv2v_lidar_second
+name: HeterBaseline_opv2v_lidar_attfuse
 
-root_dir: "dataset/OPV2V/train"
-validate_dir: "dataset/OPV2V/validate"
-test_dir: "dataset/OPV2V/test"
-
-# root_dir: "dataset/mydataset/train"
-# validate_dir: "dataset/mydataset/validate"
-# test_dir: "dataset/mydataset/test"
+root_dir: "dataset/mydataset/train"
+validate_dir: "dataset/mydataset/validate"
+test_dir: "dataset/mydataset/test"
 
 yaml_parser: "load_general_params"
 
 train_params:
-  batch_size: &batch_size 2
-  epoches: 2
+  batch_size: &batch_size 1
+  epoches: 5
   eval_freq: 5
   save_freq: 5
   max_cav: 4
@@ -20,7 +16,7 @@ train_params:
 comm_range: 70
 input_source: ['lidar']
 label_type: 'lidar'
-cav_lidar_range: &cav_lidar [-102.4, -102.4, -20, 102.4, 102.4, 20]
+cav_lidar_range: &cav_lidar [-102.4, -102.4, -5, 102.4, 102.4, 5]
 
 heter:
   assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 
@@ -38,7 +34,7 @@ heter:
       preprocess:
         core_method: 'SpVoxelPreprocessor'
         args:
-          voxel_size: &voxel_size [0.4, 0.4, 1]
+          voxel_size: &voxel_size [0.4, 0.4, 10]
           max_points_per_voxel: 32
           max_voxel_train: 32000
           max_voxel_test: 70000
@@ -65,7 +61,7 @@ data_augment:
 preprocess:
   core_method: 'SpVoxelPreprocessor'
   args:
-    voxel_size: *voxel_size
+    voxel_size: [0.4, 0.4, 10]
     max_points_per_voxel: 1
     max_voxel_train: 1
     max_voxel_test: 1
@@ -80,7 +76,7 @@ postprocess:
     w: 1.6
     h: 1.56
     r: &anchor_yaw [0, 90]
-    feature_stride: 8
+    feature_stride: 2
     num: &anchor_num 2
   target_args:
     score_threshold: 0.1
@@ -109,29 +105,22 @@ model:
         lidar_range: *cav_lidar
 
         mean_vfe:
-          num_filters: [128]
+          num_filters: [64]
           with_distance: false
           use_absolute_xyz: true
           num_point_features: 4
 
         spconv:
-          num_features_in: 4
+          num_features_in: 64
           layer_nums: [3, 5, 5]
-          layer_strides: [1, 2, 2]
-          num_filters: [128, 128, 256]
+          layer_strides: [2, 2, 2]
+          num_filters: [64, 128, 256]
           upsample_strides: [1, 2, 4]
           num_upsample_filter: [128, 128, 128]
 
         map2bev:
-          out_channels: 64
-          feature_num: 64
-
-      backbone_args:
-        layer_nums: [3, 5, 5]
-        layer_strides: [1, 2, 2]
-        num_filters: [128, 128, 256]
-        upsample_strides: [1, 2, 4]
-        num_upsample_filter: [128, 128, 128]
+          out_channels: 256
+          feature_num: 256
 
       shrink_header: 
         kernal_size: [3]
@@ -171,10 +160,10 @@ loss:
 
 optimizer:
   core_method: Adam
-  lr: 0.002
+  lr: 0.001
   args:
     eps: 1e-10
-    weight_decay: 1e-4
+    weight_decay: 1e-5
 
 lr_scheduler:
   core_method: multistep

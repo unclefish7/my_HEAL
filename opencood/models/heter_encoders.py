@@ -62,8 +62,6 @@ class SECOND(nn.Module):
                                                 'num_features_in'],
                                             grid_size=grid_size)
         self.map_to_bev = HeightCompression(args['map2bev'])
-        # ✅ 添加这行：如果你想降维到 64
-        self.downsample_bev = nn.Conv2d(256, 64, kernel_size=1)
 
     def forward(self, data_dict, modality_name):
         voxel_features = data_dict[f'inputs_{modality_name}']['voxel_features']
@@ -80,10 +78,6 @@ class SECOND(nn.Module):
         batch_dict = self.vfe(batch_dict)
         batch_dict = self.spconv_block(batch_dict)
         batch_dict = self.map_to_bev(batch_dict)
-        
-        # ✅ 在这里加打印：看输出通道数
-        batch_dict['spatial_features'] = self.downsample_bev(batch_dict['spatial_features'])
-        print(">>> map_to_bev output shape:", batch_dict['spatial_features'].shape)
         return batch_dict['spatial_features']
 
 class LiftSplatShoot(nn.Module):
