@@ -11,6 +11,9 @@ import torch
 import open3d as o3d
 from torch.utils.data import DataLoader, Subset
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 import opencood.hypes_yaml.yaml_utils as yaml_utils
 from opencood.tools import train_utils, inference_utils
 from opencood.data_utils.datasets import build_dataset
@@ -168,6 +171,7 @@ def main():
             gt_box_tensor = infer_result['gt_box_tensor']
             pred_score = infer_result['pred_score']
             
+            # 继续原有的评估流程
             eval_utils.caluclate_tp_fp(pred_box_tensor,
                                     pred_score,
                                     gt_box_tensor,
@@ -206,6 +210,45 @@ def main():
                 vis_save_path_root = os.path.join(opt.model_dir, f'vis_{infer_info}')
                 if not os.path.exists(vis_save_path_root):
                     os.makedirs(vis_save_path_root)
+
+                # BEV Heatmap 可视化功能 - 与可视化保持相同频率
+                try:
+                    # 直接调用模型获取原始输出
+                    cav_content = batch_data['ego']
+                    raw_output = model(cav_content)
+                    
+                    # 提取 cls_preds
+                    if 'cls_preds' in raw_output:
+                        cls_preds = raw_output['cls_preds']
+                        
+                        # 对 cls_preds 做 sigmoid 激活
+                        cls_preds_sigmoid = torch.sigmoid(cls_preds)
+                        
+                        # 获取 cls_preds 的实际维度
+                        batch_size, num_classes, height, width = cls_preds_sigmoid.shape
+                        
+                        # 转换为 numpy 并提取第一个batch和第一个类别（第0类）
+                        cls_heatmap = cls_preds_sigmoid[0, 0, :, :].detach().cpu().numpy()
+                        
+                        # 使用matplotlib创建热力图
+                        plt.figure(figsize=(10, 8))
+                        plt.imshow(cls_heatmap, cmap='viridis', origin='upper')
+                        plt.colorbar(label='Class Prediction Probability')
+                        plt.title(f'BEV Heatmap - Frame {i:04d} - Class 0\nShape: {cls_preds.shape}')
+                        plt.xlabel('X (Grid Cells)')
+                        plt.ylabel('Y (Grid Cells)')
+                        
+                        # 保存热力图到与可视化相同的目录
+                        heatmap_save_path = os.path.join(vis_save_path_root, 'heatmap_%05d.png' % i)
+                        plt.savefig(heatmap_save_path, dpi=300, bbox_inches='tight')
+                        plt.close()
+                        
+                        print(f"Saved BEV heatmap to: {heatmap_save_path}")
+                        print(f"cls_preds shape: {cls_preds.shape}, min: {cls_heatmap.min():.4f}, max: {cls_heatmap.max():.4f}")
+                        
+                except Exception as e:
+                    print(f"Error creating BEV heatmap for frame {i}: {str(e)}")
+                    # 继续执行，不中断推理流程
 
                 # vis_save_path = os.path.join(vis_save_path_root, '3d_%05d.png' % i)
                 # simple_vis.visualize(infer_result,
