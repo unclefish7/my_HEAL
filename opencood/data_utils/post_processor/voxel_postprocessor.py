@@ -271,10 +271,16 @@ class VoxelPostprocessor(BasePostprocessor):
         gt_box3d_tensor : torch.Tensor
             The groundtruth bounding box tensor.
         """
+        print(f"\n=== 后处理调试信息 ===")
+        print(f"score_threshold: {self.params['target_args']['score_threshold']}")
+        print(f"nms_thresh: {self.params['nms_thresh']}")
+        print(f"gt_range: {self.params['gt_range']}")
+        
         # the final bounding box list
         pred_box3d_list = []
         pred_box2d_list = []
         for cav_id in output_dict.keys():
+            print(f"\n处理 CAV {cav_id}:")
             assert cav_id in data_dict
             cav_content = data_dict[cav_id]
             # the transformation matrix to ego space
@@ -295,6 +301,11 @@ class VoxelPostprocessor(BasePostprocessor):
             prob = output_dict[cav_id]['cls_preds']
             prob = F.sigmoid(prob.permute(0, 2, 3, 1))
             prob = prob.reshape(1, -1)
+            
+            print(f"  sigmoid后概率统计: min={prob.min().item():.4f}, max={prob.max().item():.4f}, mean={prob.mean().item():.4f}")
+            print(f"  概率>0.5的数量: {(prob > 0.5).sum().item()}")
+            print(f"  概率>0.1的数量: {(prob > 0.1).sum().item()}")
+            print(f"  概率>0.01的数量: {(prob > 0.01).sum().item()}")
 
             # regression map
             reg = output_dict[cav_id]['reg_preds']
@@ -309,18 +320,42 @@ class VoxelPostprocessor(BasePostprocessor):
                 torch.gt(prob, self.params['target_args']['score_threshold'])
             mask = mask.view(1, -1)
             mask_reg = mask.unsqueeze(2).repeat(1, 1, 7)
+            
+            print(f"  通过score阈值的候选框数量: {mask.sum().item()}")
 
             # during validation/testing, the batch size should be 1
             assert batch_box3d.shape[0] == 1
             boxes3d = torch.masked_select(batch_box3d[0],
                                           mask_reg[0]).view(-1, 7)
             scores = torch.masked_select(prob[0], mask[0])
+            
+            if len(boxes3d) > 0:
+                print(f"  筛选后的预测框数量: {len(boxes3d)}")
+                print(f"  预测框坐标范围: x=[{boxes3d[:, 0].min().item():.2f}, {boxes3d[:, 0].max().item():.2f}], "
+                      f"y=[{boxes3d[:, 1].min().item():.2f}, {boxes3d[:, 1].max().item():.2f}], "
+                      f"z=[{boxes3d[:, 2].min().item():.2f}, {boxes3d[:, 2].max().item():.2f}]")
+                print(f"  预测框尺寸范围: l=[{boxes3d[:, 3].min().item():.2f}, {boxes3d[:, 3].max().item():.2f}], "
+                      f"w=[{boxes3d[:, 4].min().item():.2f}, {boxes3d[:, 4].max().item():.2f}], "
+                      f"h=[{boxes3d[:, 5].min().item():.2f}, {boxes3d[:, 5].max().item():.2f}]")
+            else:
+                print(f"  筛选后的预测框数量: 0 (可能score_threshold={self.params['target_args']['score_threshold']}过高)")
+
+            # during validation/testing, the batch size should be 1
+            assert batch_box3d.shape[0] == 1
+            boxes3d = torch.masked_select(batch_box3d[0], mask_reg[0]).view(-1, 7)
+            scores = torch.masked_select(prob[0], mask[0])
+            
+            print(f"初步筛选后boxes3d数量: {len(boxes3d)}")
+            
+            if len(boxes3d) > 0:
+                print(f"boxes3d范围 - x: [{boxes3d[:, 0].min():.2f}, {boxes3d[:, 0].max():.2f}]")
+                print(f"boxes3d范围 - y: [{boxes3d[:, 1].min():.2f}, {boxes3d[:, 1].max():.2f}]")
+                print(f"boxes3d范围 - z: [{boxes3d[:, 2].min():.2f}, {boxes3d[:, 2].max():.2f}]")
 
             # adding dir classifier
             if 'dir_preds' in output_dict[cav_id].keys() and len(boxes3d) !=0:
                 dir_offset = self.params['dir_args']['dir_offset']
                 num_bins = self.params['dir_args']['num_bins']
-
 
                 dm  = output_dict[cav_id]['dir_preds'] # [N, H, W, 4]
                 dir_cls_preds = dm.permute(0, 2, 3, 1).contiguous().reshape(1, -1, num_bins) # [1, N*H*W*2, 2]
@@ -336,10 +371,15 @@ class VoxelPostprocessor(BasePostprocessor):
                 boxes3d[..., 6] = limit_period(boxes3d[..., 6], 0.5, 2 * np.pi) # limit to [-pi, pi]
 
             if 'iou_preds' in output_dict[cav_id].keys() and len(boxes3d) != 0:
+                print(f"  检测到IoU预测分支")
                 iou = torch.sigmoid(output_dict[cav_id]['iou_preds'].permute(0, 2, 3, 1).contiguous()).reshape(1, -1)
                 iou = torch.clamp(iou, min=0.0, max=1.0)
                 iou = (iou + 1) * 0.5
-                scores = scores * torch.pow(iou.masked_select(mask), 4)
+                iou_selected = iou.masked_select(mask)
+                print(f"  IoU值范围: [{iou_selected.min():.4f}, {iou_selected.max():.4f}]")
+                print(f"  应用IoU权重前scores范围: [{scores.min():.4f}, {scores.max():.4f}]")
+                scores = scores * torch.pow(iou_selected, 4)
+                print(f"  应用IoU权重后scores范围: [{scores.min():.4f}, {scores.max():.4f}]")
 
             # convert output to bounding box
             if len(boxes3d) != 0:
@@ -362,43 +402,73 @@ class VoxelPostprocessor(BasePostprocessor):
 
                 pred_box2d_list.append(boxes2d_score)
                 pred_box3d_list.append(projected_boxes3d)
+                
+                print(f"添加到列表的预测框数量: {len(projected_boxes3d)}")
 
+        print(f"\n总共收集到的预测框列表长度: {len(pred_box3d_list)}")
+        
         if len(pred_box2d_list) ==0 or len(pred_box3d_list) == 0:
+            print("❌ 没有预测框通过初步筛选，返回None")
             return None, None
+            
         # shape: (N, 5)
         pred_box2d_list = torch.vstack(pred_box2d_list)
         # scores
         scores = pred_box2d_list[:, -1]
         # predicted 3d bbx
         pred_box3d_tensor = torch.vstack(pred_box3d_list)
+        
+        print(f"合并后预测框总数: {len(pred_box3d_tensor)}")
+        print(f"合并后scores范围: [{scores.min():.4f}, {scores.max():.4f}]")
+        
         # remove large bbx
         keep_index_1 = box_utils.remove_large_pred_bbx(pred_box3d_tensor)
         keep_index_2 = box_utils.remove_bbx_abnormal_z(pred_box3d_tensor)
         keep_index = torch.logical_and(keep_index_1, keep_index_2)
+        
+        print(f"大尺寸过滤后保留: {keep_index_1.sum()}/{len(keep_index_1)}")
+        print(f"异常Z过滤后保留: {keep_index_2.sum()}/{len(keep_index_2)}")
+        print(f"综合过滤后保留: {keep_index.sum()}/{len(keep_index)}")
 
         pred_box3d_tensor = pred_box3d_tensor[keep_index]
         scores = scores[keep_index]
 
-        # STEP3
-        # nms
+        if len(pred_box3d_tensor) == 0:
+            print("❌ 所有预测框在尺寸/Z值过滤中被移除")
+            return None, None
+
+        # STEP3 - NMS
+        nms_thresh = self.params['nms_thresh']
+        print(f"NMS阈值: {nms_thresh}")
+        
         keep_index = box_utils.nms_rotated(pred_box3d_tensor,
                                            scores,
-                                           self.params['nms_thresh']
-                                           )
+                                           nms_thresh)
+        
+        print(f"NMS后保留: {len(keep_index)}/{len(pred_box3d_tensor)}")
 
         pred_box3d_tensor = pred_box3d_tensor[keep_index]
-
-        # select cooresponding score
         scores = scores[keep_index]
         
+        if len(pred_box3d_tensor) == 0:
+            print("❌ 所有预测框在NMS中被移除")
+            return None, None
+        
         # filter out the prediction out of the range. with z-dim
+        print(f"gt_range: {self.params['gt_range']}")
         pred_box3d_np = pred_box3d_tensor.cpu().numpy()
         pred_box3d_np, mask = box_utils.mask_boxes_outside_range_numpy(pred_box3d_np,
                                                     self.params['gt_range'],
                                                     order=None,
                                                     return_mask=True)
+        
+        print(f"范围过滤后保留: {mask.sum()}/{len(mask)}")
+        
         pred_box3d_tensor = torch.from_numpy(pred_box3d_np).to(device=pred_box3d_tensor.device)
         scores = scores[mask]
+
+        print(f"最终输出预测框数量: {len(pred_box3d_tensor)}")
+        print(f"=== DEBUG: post_process结束 ===\n")
 
         assert scores.shape[0] == pred_box3d_tensor.shape[0]
 

@@ -859,12 +859,19 @@ def remove_large_pred_bbx(bbx_3d):
     bbx_y_min = torch.min(bbx_3d[:, :, 1], dim=1)[0]
     y_len = bbx_y_max - bbx_y_min
 
-    bbx_z_max = torch.max(bbx_3d[:, :, 1], dim=1)[0]
-    bbx_z_min = torch.min(bbx_3d[:, :, 1], dim=1)[0]
+    # 修复bug：应该是z坐标，不是y坐标
+    bbx_z_max = torch.max(bbx_3d[:, :, 2], dim=1)[0]
+    bbx_z_min = torch.min(bbx_3d[:, :, 2], dim=1)[0]
     z_len = bbx_z_max - bbx_z_min
 
+    # 调试信息
+    print(f"    大尺寸过滤调试: x_len范围=[{x_len.min():.2f}, {x_len.max():.2f}], y_len范围=[{y_len.min():.2f}, {y_len.max():.2f}], z_len范围=[{z_len.min():.2f}, {z_len.max():.2f}]")
+    
+    # 修复bug：z_len应该有合理的上限检查，而不是直接作为布尔值
     index = torch.logical_and(x_len <= 6, y_len <= 6)
-    index = torch.logical_and(index, z_len)
+    index = torch.logical_and(index, z_len <= 4)  # 添加合理的z维度限制
+    
+    print(f"    大尺寸过滤后保留: {index.sum()}/{len(index)}")
 
     return index
 
@@ -885,7 +892,17 @@ def remove_bbx_abnormal_z(bbx_3d):
     """
     bbx_z_min = torch.min(bbx_3d[:, :, 2], dim=1)[0]
     bbx_z_max = torch.max(bbx_3d[:, :, 2], dim=1)[0]
-    index = torch.logical_and(bbx_z_min >= -3, bbx_z_max <= 1)
+    # 调试信息
+    print(f"    Z过滤调试: z_min范围=[{bbx_z_min.min():.2f}, {bbx_z_min.max():.2f}], z_max范围=[{bbx_z_max.min():.2f}, {bbx_z_max.max():.2f}]")
+    print(f"    原始过滤条件: z_min >= -3 AND z_max <= 1")
+    
+    # 根据你的数据范围调整过滤条件
+    # 原来的条件：z_min >= -3 AND z_max <= 1
+    # 修改为更宽松的条件，适应你的数据范围 [0.70, 1.51]
+    index = torch.logical_and(bbx_z_min >= -5, bbx_z_max <= 5)
+    
+    print(f"    修改后过滤条件: z_min >= -5 AND z_max <= 5")
+    print(f"    Z过滤后保留: {index.sum()}/{len(index)}")
 
     return index
 
