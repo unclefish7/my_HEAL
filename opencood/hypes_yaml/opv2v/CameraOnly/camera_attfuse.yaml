@@ -1,16 +1,16 @@
-name: HeterBaseline_opv2v_camera_attfuse
+name: mydataset_opv2v_camera_attfuse
 # root_dir: "dataset/OPV2V/train"
 # validate_dir: "dataset/OPV2V/validate"
 # test_dir: "dataset/OPV2V/test"
 
-root_dir: "dataset/mydataset/train"
-validate_dir: "dataset/mydataset/validate"
-test_dir: "dataset/mydataset/test"
+root_dir: "dataset/mydataset_OPV2V_h50_seg_cam_lidar/train"
+validate_dir: "dataset/mydataset_OPV2V_h50_seg_cam_lidar/validate"
+test_dir: "dataset/mydataset_OPV2V_h50_seg_cam_lidar/test"
 
 yaml_parser: "load_general_params"
 train_params:
   batch_size: &batch_size 1
-  epoches: 2
+  epoches: 20
   eval_freq: 2
   save_freq: 2
   max_cav: 5
@@ -20,7 +20,7 @@ input_source: ['camera'] #, 'depth']
 label_type: 'camera'
 cav_lidar_range: &cav_lidar [-51.2, -51.2, -30, 51.2, 51.2, 20]
 
-# add_data_extension: ['bev_visibility.png']
+add_data_extension: ['bev_visibility.png']
 
 heter:
   assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 

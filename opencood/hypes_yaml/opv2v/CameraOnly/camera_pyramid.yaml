@@ -1,7 +1,11 @@
-name: HeterBaseline_opv2v_camera_pyramid
-root_dir: "dataset/OPV2V/train"
-validate_dir: "dataset/OPV2V/validate"
-test_dir: "dataset/OPV2V/test"
+name: mydataset_HeterBaseline_opv2v_camera_pyramid
+# root_dir: "dataset/OPV2V/train"
+# validate_dir: "dataset/OPV2V/validate"
+# test_dir: "dataset/OPV2V/test"
+
+root_dir: "dataset/mydataset_OPV2V_h50_seg_cam_lidar/train"
+validate_dir: "dataset/mydataset_OPV2V_h50_seg_cam_lidar/validate"
+test_dir: "dataset/mydataset_OPV2V_h50_seg_cam_lidar/test"
 
 yaml_parser: "load_general_params"
 train_params:
@@ -12,11 +16,11 @@ train_params:
   max_cav: 5
 
 comm_range: 70
-input_source: ['camera', 'depth']
+input_source: ['camera'] #, 'depth']
 label_type: 'camera'
-cav_lidar_range: &cav_lidar [-51.2, -51.2, -3, 51.2, 51.2, 1]
+cav_lidar_range: &cav_lidar [-51.2, -51.2, -2, 51.2, 51.2, 2]
 
-add_data_extension: ['bev_visibility.png']
+# add_data_extension: ['bev_visibility.png']
 
 heter:
   assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 
@@ -111,7 +115,7 @@ model:
         img_downsample: 8
         img_features: &img_feature 128
         use_depth_gt: false
-        depth_supervision: true
+        depth_supervision: false
         camera_encoder: EfficientNet
 
       camera_mask_args:
