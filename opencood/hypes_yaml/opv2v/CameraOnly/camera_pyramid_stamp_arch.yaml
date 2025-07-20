@@ -1,4 +1,4 @@
-name: mydataset_HeterBaseline_opv2v_camera_pyramid
+name: mydataset_HeterBaseline_opv2v_camera_pyramid_stamp_arch
 # root_dir: "dataset/OPV2V/train"
 # validate_dir: "dataset/OPV2V/validate"
 # test_dir: "dataset/OPV2V/test"
@@ -9,7 +9,7 @@ test_dir: "dataset/mydataset_OPV2V_h50_seg_cam_lidar/test"
 
 yaml_parser: "load_general_params"
 train_params:
-  batch_size: &batch_size 1  # 固定为1，适配显存限制
+  batch_size: &batch_size 1  # STAMP配置
   epoches: 30
   eval_freq: 2
   save_freq: 2
@@ -17,11 +17,11 @@ train_params:
 
 comm_range: 70
 input_source: ['camera']  # 只使用camera，注释掉depth因为数据集无此信息
-# input_source: ['camera', 'depth']  # 从STAMP借鉴，增加depth输入源以获得更丰富特征
+# input_source: ['camera', 'depth']  # STAMP原有配置
 label_type: 'camera'
 cav_lidar_range: &cav_lidar [-51.2, -51.2, -2, 51.2, 51.2, 2]
 
-add_data_extension: ['bev_visibility.png']  # 从STAMP借鉴，启用BEV可视化扩展
+# add_data_extension: ['bev_visibility.png']
 
 heter:
   assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 
@@ -89,7 +89,7 @@ postprocess:
   target_args:
     pos_threshold: 0.6
     neg_threshold: 0.45
-    score_threshold: 0.2  # STAMP使用相同阈值，但训练效果更好
+    score_threshold: 0.2
   order: 'hwl' # hwl or lwh
   max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
   nms_thresh: 0.15
@@ -98,16 +98,15 @@ postprocess:
     num_bins: 2
     anchor_yaw: *anchor_yaw
 
-# model related
+# model related - 尝试STAMP架构
 model:
-  core_method: heter_pyramid_collab
+  core_method: homo_collab  # 改为STAMP的core_method
   args:
-    lidar_range: *cav_lidar
     supervise_single: true
-
-    m2:
+    m2:  # 保持m2作为ego_modality
       core_method: *core_method_m2
       sensor_type: *sensor_type_m2
+      lidar_range: &cav_lidar_m2 [-51.2, -51.2, -2, 51.2, 51.2, 2] # 需要在此定义
 
       encoder_args:
         anchor_number: *anchor_num
@@ -132,25 +131,27 @@ model:
       aligner_args:
         core_method: identity
 
-    fusion_backbone: 
-      resnext: true
-      layer_nums: [3, 5, 8]
-      layer_strides: [1, 2, 2]
-      num_filters: [64, 128, 256]
-      upsample_strides: [1, 2, 4]
-      num_upsample_filter: [128, 128, 128]
+      fusion_method: pyramid  # STAMP的显式融合方法
+
+      fusion_backbone: 
+        resnext: true
+        layer_nums: [3, 5, 8]
+        layer_strides: [1, 2, 2]
+        num_filters: [64, 128, 256]
+        upsample_strides: [1, 2, 4]
+        num_upsample_filter: [128, 128, 128]
+        anchor_number: *anchor_num
+
+      shrink_header: 
+        kernal_size: [ 3 ]
+        stride: [ 1 ]
+        padding: [ 1 ]
+        dim: [ 256 ]
+        input_dim: 384 # 128 * 3
+
+      in_head: 256
       anchor_number: *anchor_num
-
-    shrink_header: 
-      kernal_size: [ 3 ]
-      stride: [ 1 ]
-      padding: [ 1 ]
-      dim: [ 256 ]
-      input_dim: 384 # 128 * 3
-
-    in_head: 256
-    anchor_number: *anchor_num
-    dir_args: *dir_args
+      dir_args: *dir_args
 
 
 loss:
@@ -188,5 +189,4 @@ optimizer:
 lr_scheduler:
   core_method: multistep #step, multistep and Exponential support
   gamma: 0.1
-  step_size: [15, 25]  # 从STAMP借鉴，调整学习率衰减策略
-
+  step_size: [15, 25]  # STAMP的学习率调度策略

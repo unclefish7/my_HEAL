@@ -1,4 +1,4 @@
-name: mydataset_HeterBaseline_opv2v_camera_pyramid
+name: mydataset_HeterBaseline_opv2v_camera_pyramid_enhanced
 # root_dir: "dataset/OPV2V/train"
 # validate_dir: "dataset/OPV2V/validate"
 # test_dir: "dataset/OPV2V/test"
@@ -17,11 +17,11 @@ train_params:
 
 comm_range: 70
 input_source: ['camera']  # 只使用camera，注释掉depth因为数据集无此信息
-# input_source: ['camera', 'depth']  # 从STAMP借鉴，增加depth输入源以获得更丰富特征
+# input_source: ['camera', 'depth']  # 从STAMP借鉴，增加深度输入源
 label_type: 'camera'
 cav_lidar_range: &cav_lidar [-51.2, -51.2, -2, 51.2, 51.2, 2]
 
-add_data_extension: ['bev_visibility.png']  # 从STAMP借鉴，启用BEV可视化扩展
+add_data_extension: ['bev_visibility.png']  # 从STAMP借鉴，启用BEV可视化
 
 heter:
   assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 
@@ -37,9 +37,9 @@ heter:
       core_method: &core_method_m2 "lift_splat_shoot"
 
       grid_conf: &grid_conf_m2
-        xbound: [-51.2, 51.2, 0.4]   # Limit the range of the x direction and divide the grids
-        ybound: [-51.2, 51.2, 0.4]   # Limit the range of the y direction and divide the grids
-        zbound: [-10, 10, 20.0]   # Limit the range of the z direction and divide the grids
+        xbound: [-51.2, 51.2, 0.4]
+        ybound: [-51.2, 51.2, 0.4]
+        zbound: [-10, 10, 20.0]
         ddiscr: [2, 50, 48]
         mode: 'LID'
       data_aug_conf: &data_aug_conf_m2
@@ -59,24 +59,21 @@ fusion:
   dataset: 'opv2v'
   args: 
     proj_first: false
-    grid_conf: None # place-holder
-    data_aug_conf: None # place-holder
+    grid_conf: None
+    data_aug_conf: None
 
 
 preprocess:
-  # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
   core_method: 'SpVoxelPreprocessor'
   args:
-    voxel_size: [0.4, 0.4, 4] # useful
-    max_points_per_voxel: 1 # useless
-    max_voxel_train: 1 # useless
-    max_voxel_test: 1 # useless
-  # lidar range for each individual cav.
+    voxel_size: [0.4, 0.4, 4]
+    max_points_per_voxel: 1
+    max_voxel_train: 1
+    max_voxel_test: 1
   cav_lidar_range: *cav_lidar
 
-# anchor box related
 postprocess:
-  core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+  core_method: 'VoxelPostprocessor'
   gt_range: *cav_lidar
   anchor_args:
     cav_lidar_range: *cav_lidar
@@ -89,18 +86,18 @@ postprocess:
   target_args:
     pos_threshold: 0.6
     neg_threshold: 0.45
-    score_threshold: 0.2  # STAMP使用相同阈值，但训练效果更好
-  order: 'hwl' # hwl or lwh
-  max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+    score_threshold: 0.2  # STAMP验证过的有效阈值
+  order: 'hwl'
+  max_num: 150
   nms_thresh: 0.15
   dir_args: &dir_args
     dir_offset: 0.7853
     num_bins: 2
     anchor_yaw: *anchor_yaw
 
-# model related
+# model related - 增强的HEAL架构，融合STAMP改进
 model:
-  core_method: heter_pyramid_collab
+  core_method: heter_pyramid_collab  # 保持HEAL核心方法
   args:
     lidar_range: *cav_lidar
     supervise_single: true
@@ -116,8 +113,8 @@ model:
         img_downsample: 8
         img_features: &img_feature 128
         use_depth_gt: false
-        depth_supervision: false
-        camera_encoder: EfficientNet
+        depth_supervision: false  # 禁用depth supervision，数据集无depth信息
+        camera_encoder: EfficientNet  # 与STAMP m1一致的编码器
 
       camera_mask_args:
         cav_lidar_range: *cav_lidar
@@ -132,6 +129,7 @@ model:
       aligner_args:
         core_method: identity
 
+    # 保持HEAL的全局融合架构，但应用STAMP的参数优化
     fusion_backbone: 
       resnext: true
       layer_nums: [3, 5, 8]
@@ -152,6 +150,10 @@ model:
     anchor_number: *anchor_num
     dir_args: *dir_args
 
+    # 从STAMP借鉴的特征压缩机制（可选）
+    # compressor:
+    #   input_dim: 128
+    #   compress_ratio: 0.5
 
 loss:
   core_method: point_pillar_pyramid_loss
@@ -171,11 +173,11 @@ loss:
       type: 'WeightedSoftmaxClassificationLoss'
       weight: 0.2
       args: *dir_args
-    depth:
-      weight: 1.0
+    # depth:
+    #   weight: 1.0  # 注释掉深度损失权重，数据集无depth信息
     pyramid:
       relative_downsample: [1, 2, 4]
-      weight: [0.4, 0.2, 0.1]
+      weight: [0.4, 0.2, 0.1]  # STAMP验证的金字塔损失权重
 
 
 optimizer:
@@ -186,7 +188,6 @@ optimizer:
     weight_decay: 1e-4
 
 lr_scheduler:
-  core_method: multistep #step, multistep and Exponential support
+  core_method: multistep
   gamma: 0.1
-  step_size: [15, 25]  # 从STAMP借鉴，调整学习率衰减策略
-
+  step_size: [15, 25]  # STAMP的学习率调度策略
